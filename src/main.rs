@@ -1,9 +1,9 @@
-use nannou::noise::{Billow, Exponent, RidgedMulti,HybridMulti, Fbm,  NoiseFn, Perlin};
+use nannou::color::{Gradient, IntoLinSrgba};
+use nannou::noise::{Billow, Exponent, NoiseFn};
 use nannou::prelude::*;
 use rayon::prelude::*;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use nannou::color::{Gradient, IntoLinSrgba, IntoColor, Alpha};
 
 const SUN_RADIUS: u32 = 30;
 const SUN_AURA_SIZE: u32 = 30;
@@ -17,14 +17,13 @@ const STAR_RADIUS: f32 = 2.;
 const STAR_AURA_SIZE: u32 = 6;
 
 const MOON_RADIUS: u32 = (SUN_RADIUS / 2) + (SUN_RADIUS / 5);
-const MOON_POS: (f32, f32) = (SCREEN_SIZE_F / 4., SUN_START_Y*1.13);
+const MOON_POS: (f32, f32) = (SCREEN_SIZE_F / 4., SUN_START_Y * 1.13);
 const MOON_AURA_SIZE: u32 = MOON_RADIUS / 2;
 const MOON_SPOTS_COLOR: Srgb<u8> = DARKGRAY;
 
 const CLOUD_NIGHT_COLOR: Srgb<u8> = GRAY;
 const NIGHT_SKY_COLOR: Srgb<u8> = rgb(20, 30, 37);
-const SUNSET_SKY_COLOR: Srgb<u8> = rgb(254,172,39);
-
+const SUNSET_SKY_COLOR: Srgb<u8> = rgb(254, 172, 39);
 
 const BILLOW_OCTAVES: usize = 6;
 const WIND_SPEED: f64 = 20.;
@@ -39,11 +38,14 @@ const ALPHA_ZERO_SCALING: f64 = 1.2;
 const SPEEDUP_FACTOR: f64 = 9.5;
 const Y_OFFSET: f64 = 50.;
 
-const fn rgb(red: u8, green: u8, blue: u8) -> Srgb<u8>{
-    Rgb{red,green,blue,standard:PhantomData}
+const fn rgb(red: u8, green: u8, blue: u8) -> Srgb<u8> {
+    Rgb {
+        red,
+        green,
+        blue,
+        standard: PhantomData,
+    }
 }
-
-
 
 type Points = [[f64; (NUM_POINTS) as usize]; (NUM_POINTS) as usize];
 type Color = Rgba<u8>;
@@ -51,9 +53,6 @@ type Color = Rgba<u8>;
 fn main() {
     nannou::app(model).update(update).run();
 }
-
-
-
 
 #[inline(always)]
 fn with_alpha(c: Color, alpha: f64) -> Color {
@@ -109,14 +108,21 @@ impl Sun {
         let angle = -deg_to_rad((frames % increments) * SUN_CYCLE_SPEED);
         let x = SUN_ROTATE_POINT.0 + angle.cos() * (sx - SUN_ROTATE_POINT.0)
             - angle.sin() * (sy - SUN_ROTATE_POINT.1);
-        let y = SUN_ROTATE_POINT.1 + angle.sin() * (sx - SUN_ROTATE_POINT.0)
+        let y = SUN_ROTATE_POINT.1
+            + angle.sin() * (sx - SUN_ROTATE_POINT.0)
             + angle.cos() * (sy - SUN_ROTATE_POINT.1);
         self.pos = pt2(x, y)
     }
-    
-    fn transition_sky_color(amount: f32) -> Rgb<u8>{
-        
-        let gradient = Gradient::new([LIGHTSKYBLUE.into_lin_srgba(), SUNSET_SKY_COLOR.into_lin_srgba(),  NIGHT_SKY_COLOR.into_lin_srgba(), NIGHT_SKY_COLOR.into_lin_srgba()].into_iter());
+
+    fn transition_sky_color(amount: f32) -> Rgb<u8> {
+        let gradient = Gradient::new(
+            [
+                LIGHTSKYBLUE.into_lin_srgba(),
+                SUNSET_SKY_COLOR.into_lin_srgba(),
+                NIGHT_SKY_COLOR.into_lin_srgba(),
+            ]
+            .into_iter(),
+        );
         let mut take = gradient.take(101);
         let c = Rgba::from_linear(take.nth(map_range(amount, 0., 1., 0, 100)).unwrap());
         let red = map_range(c.red, 0., 1., 0, 255);
@@ -124,13 +130,12 @@ impl Sun {
         let blue = map_range(c.blue, 0., 1., 0, 255);
         Rgb::new(red, green, blue)
     }
- 
 
-    fn rising_amount(&self) -> Option<f32>{
+    fn rising_amount(&self) -> Option<f32> {
         let p = &self.pos;
         let edge_x = p.x - SUN_RADIUS as f32;
-        if edge_x <= 0. && self.has_set(){
-            let amt = map_range(edge_x, (SUN_RADIUS as f32)*-2., 0., 0., 1.);
+        if edge_x <= 0. && self.has_set() {
+            let amt = map_range(edge_x, (SUN_RADIUS as f32) * -2., 0., 0., 1.);
             let amt = clamp(amt, 0., 1.);
             Some(amt)
         } else {
@@ -138,88 +143,93 @@ impl Sun {
         }
     }
 
-    fn setting_amount(&self) -> Option<f32>{
+    fn setting_amount(&self) -> Option<f32> {
         let p = &self.pos;
         let edge_x = p.x + SUN_RADIUS as f32;
-        if edge_x >= SCREEN_SIZE_F && !self.has_set(){
-            let amt = map_range(edge_x, SCREEN_SIZE_F, SCREEN_SIZE_F + (SUN_RADIUS as f32)*2., 0., 1.);
+        if edge_x >= SCREEN_SIZE_F && !self.has_set() {
+            let amt = map_range(
+                edge_x,
+                SCREEN_SIZE_F,
+                SCREEN_SIZE_F + (SUN_RADIUS as f32) * 2.,
+                0.,
+                1.,
+            );
             let amt = clamp(amt, 0., 1.);
             Some(amt)
         } else {
             None
         }
     }
-    fn has_set(&self) -> bool{
+    fn has_set(&self) -> bool {
         let p = &self.pos;
         !((p.x - SUN_RADIUS as f32) > 0. && p.y > 0. && p.x - (SUN_RADIUS as f32) < SCREEN_SIZE_F)
     }
 }
 
-struct Stars{
-    points: [Point2; STAR_COUNT]
+struct Stars {
+    points: [Point2; STAR_COUNT],
 }
 
-impl Stars{
-    fn random_sky() -> Self{
+impl Stars {
+    fn random_sky() -> Self {
         let mut stars = vec![];
-        for _ in 0..STAR_COUNT{
-            stars.push(Point2::new(random_f32() * SCREEN_SIZE_F, random_f32() * SCREEN_SIZE_F))
+        for _ in 0..STAR_COUNT {
+            stars.push(Point2::new(
+                random_f32() * SCREEN_SIZE_F,
+                random_f32() * SCREEN_SIZE_F,
+            ))
         }
-        Stars { 
-            points: stars.try_into().expect("stars slice equals length of star count")
+        Stars {
+            points: stars
+                .try_into()
+                .expect("stars slice equals length of star count"),
         }
     }
 }
 
-impl Deref for Stars{
+impl Deref for Stars {
     type Target = [Point2; STAR_COUNT];
     fn deref(&self) -> &Self::Target {
         &self.points
     }
 }
 
-struct Moon{
-    texture: Vec<(Point2, f64)>
+struct Moon {
+    texture: Vec<(Point2, f64)>,
 }
 
-impl Moon{
-    fn new() -> Self{
+impl Moon {
+    fn new() -> Self {
         let mut texture = vec![];
         let mut billow = Billow::new();
         billow.persistence = 0.15;
-        let noise = Exponent::<[f64;2]>::new(&billow);
+        let noise = Exponent::<[f64; 2]>::new(&billow);
         let x = MOON_POS.0;
         let y = MOON_POS.1;
         let center = pt2(x, y);
         let r_i = MOON_RADIUS as i64;
 
-        for i in (-r_i..r_i){
-            for j in (-r_i..r_i){
+        for i in -r_i..r_i {
+            for j in -r_i..r_i {
                 let px = x - i as f32;
                 let py = y - j as f32;
                 let point = pt2(px, py);
-                if point.distance(center) < MOON_RADIUS as f32{
+                if point.distance(center) < MOON_RADIUS as f32 {
                     let mut alpha = noise.get([px as f64 / 2., py as f64 / 2.]).abs() * 0.75;
-                    if alpha < 0.2{
+                    if alpha < 0.2 {
                         alpha = 0.;
                     } else {
                         alpha = map_range(alpha, 0.2, 1., 0., 0.85);
                     }
-                    
+
                     texture.push((pt2(px, py), alpha));
                 }
-
             }
         }
 
-        Self{
-            texture
-        }
-        
+        Self { texture }
     }
-
 }
-
 
 struct Model {
     _window: window::Id,
@@ -267,7 +277,14 @@ fn update(app: &App, model: &mut Model, _update: Update) {
 
     let mut iter_x = Some((0..NUM_POINTS).into_par_iter());
     let iter_y = (0..NUM_POINTS).into_iter();
-    model.sun.advance_sun_pos(app.elapsed_frames() * if model.speedup { SPEEDUP_FACTOR as u64} else { 1 });
+    model.sun.advance_sun_pos(
+        app.elapsed_frames()
+            * if model.speedup {
+                SPEEDUP_FACTOR as u64
+            } else {
+                1
+            },
+    );
     model.points = iter_x
         .take()
         .unwrap()
@@ -301,19 +318,18 @@ fn update(app: &App, model: &mut Model, _update: Update) {
         .try_into()
         .unwrap();
 
-    let color = Sun::transition_sky_color(if let Some(amt) = model.sun.rising_amount(){
+    let color = Sun::transition_sky_color(if let Some(amt) = model.sun.rising_amount() {
         1. - amt
-    } else if let Some(amt) = model.sun.setting_amount(){
+    } else if let Some(amt) = model.sun.setting_amount() {
         amt
-    } else if model.sun.has_set(){
+    } else if model.sun.has_set() {
         1.
-    } else{
+    } else {
         0.
     });
     model.sky_color = color.into();
 
-
-    if !model.sun.has_set(){
+    if !model.sun.has_set() {
         let mut covered_points = 0.;
         for x in 0..model.points.len() {
             for y in 0..model.points[x].len() {
@@ -333,8 +349,6 @@ fn update(app: &App, model: &mut Model, _update: Update) {
     } else {
         model.darkened_sky_color = NIGHT_SKY_COLOR.into();
     }
-    
-
 }
 
 fn event(app: &App, model: &mut Model, event: WindowEvent) {
@@ -367,9 +381,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
     let draw = draw.x_y(-(SCREEN_SIZE_F) / 2., -(SCREEN_SIZE_F) / 2.);
     frame.clear(model.darkened_sky_color);
 
-    
-
-    if !model.sun.has_set(){
+    if !model.sun.has_set() {
         //draw sun
         draw.ellipse()
             .x_y(model.sun.pos.x, model.sun.pos.y)
@@ -388,41 +400,38 @@ fn view(app: &App, model: &Model, frame: Frame) {
                 .finish();
         }
     } else {
-
         //moon aura
-        for i in 0..MOON_AURA_SIZE{
+        for i in 0..MOON_AURA_SIZE {
             let alpha = map_range(i, 0, MOON_AURA_SIZE, 0.7, 1.).log10().abs();
-                let color = with_alpha(GAINSBORO.into(), alpha);
-                draw.ellipse()
-                    .no_fill()
-                    .stroke_weight(1.)
-                    .x_y(MOON_POS.0, MOON_POS.1)
-                    .stroke_color(color)
-                    .radius((MOON_RADIUS + i) as f32)
-                    .finish();
+            let color = with_alpha(GAINSBORO.into(), alpha);
+            draw.ellipse()
+                .no_fill()
+                .stroke_weight(1.)
+                .x_y(MOON_POS.0, MOON_POS.1)
+                .stroke_color(color)
+                .radius((MOON_RADIUS + i) as f32)
+                .finish();
         }
     }
-    
-    for (star) in model.stars.iter(){
-        let star_alpha = if let Some(amt) = model.sun.rising_amount(){
+
+    for star in model.stars.iter() {
+        let star_alpha = if let Some(amt) = model.sun.rising_amount() {
             amt.log10().abs()
-        } else if let Some(amt) = model.sun.setting_amount(){
+        } else if let Some(amt) = model.sun.setting_amount() {
             1. - (amt.log10().abs())
-        } else if model.sun.has_set(){
+        } else if model.sun.has_set() {
             1.
-        } else{
+        } else {
             0.
         };
-        if star_alpha > 0.{
-
-        
+        if star_alpha > 0. {
             draw.ellipse()
                 .x_y(star.x, star.y)
                 .color(white_with_alpha(star_alpha as f64))
                 .radius(STAR_RADIUS)
                 .finish();
 
-            for i in 0..STAR_AURA_SIZE{
+            for i in 0..STAR_AURA_SIZE {
                 let alpha = map_range(i, 0, STAR_AURA_SIZE, 0.8, 1.).log10().abs();
                 let color = with_alpha(GAINSBORO.into(), alpha * star_alpha as f64);
                 draw.ellipse()
@@ -434,27 +443,36 @@ fn view(app: &App, model: &Model, frame: Frame) {
                     .finish();
             }
         }
-
     }
-    
 
     //draw moon
     draw.ellipse()
         .x_y(MOON_POS.0, MOON_POS.1)
         .radius(MOON_RADIUS as f32)
-        .color(if model.sun.has_set(){CORNSILK.into()} else {Rgb::new(215,239,253)})
+        .color(if model.sun.has_set() {
+            CORNSILK.into()
+        } else {
+            Rgb::new(215, 239, 253)
+        })
         .finish();
 
     //moon spots
-    for (point, alpha) in &model.moon.texture{
-        let alpha = if !model.sun.has_set(){
+    for (point, alpha) in &model.moon.texture {
+        let alpha = if !model.sun.has_set() {
             *alpha * 0.75
         } else {
             *alpha
         };
         draw.ellipse()
             .x_y(point.x, point.y)
-            .color(with_alpha(if model.sun.has_set(){MOON_SPOTS_COLOR.into()} else {Rgb::new(143,198,232).into()}, alpha))
+            .color(with_alpha(
+                if model.sun.has_set() {
+                    MOON_SPOTS_COLOR.into()
+                } else {
+                    Rgb::new(143, 198, 232).into()
+                },
+                alpha,
+            ))
             .radius(1.5)
             .finish()
     }
@@ -466,17 +484,15 @@ fn view(app: &App, model: &Model, frame: Frame) {
             let alpha = row[y];
             draw.ellipse()
                 .x_y(x as f32 * PIXELS_PER_POINT_F, y as f32 * PIXELS_PER_POINT_F)
-                .color(
-                    if !model.sun.has_set(){
-                        white_with_alpha(alpha)
-                    } else {
-                        with_alpha(CLOUD_NIGHT_COLOR.into(), alpha)
-                    }
-                )
+                .color(if !model.sun.has_set() {
+                    white_with_alpha(alpha)
+                } else {
+                    with_alpha(CLOUD_NIGHT_COLOR.into(), alpha)
+                })
                 .radius(PIXELS_PER_POINT_F * 3.)
                 .finish();
         }
     }
-   
+
     draw.to_frame(app, &frame).unwrap();
 }
