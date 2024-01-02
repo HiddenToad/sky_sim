@@ -137,6 +137,9 @@ impl Sun {
         if edge_x <= 0. && self.has_set() {
             let amt = map_range(edge_x, (SUN_RADIUS as f32) * -2., 0., 0., 1.);
             let amt = clamp(amt, 0., 1.);
+            let amt = 1. - amt.log10().abs();
+            let amt = clamp(amt, 0., 1.);
+
             Some(amt)
         } else {
             None
@@ -155,6 +158,8 @@ impl Sun {
                 1.,
             );
             let amt = clamp(amt, 0., 1.);
+            let amt = 1. - amt.log10().abs();
+            let amt = clamp(amt, 0., 1.);
             Some(amt)
         } else {
             None
@@ -162,7 +167,7 @@ impl Sun {
     }
     fn has_set(&self) -> bool {
         let p = &self.pos;
-        !((p.x - SUN_RADIUS as f32) > 0. && p.y > 0. && p.x - (SUN_RADIUS as f32) < SCREEN_SIZE_F)
+        !((p.x - SUN_RADIUS as f32) > 0. && p.y > 0. && p.x - (SUN_RADIUS as f32 + SUN_AURA_SIZE as f32) < SCREEN_SIZE_F)
     }
 }
 
@@ -416,9 +421,14 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
     for star in model.stars.iter() {
         let star_alpha = if let Some(amt) = model.sun.rising_amount() {
-            amt.log10().abs()
+            1. - amt
         } else if let Some(amt) = model.sun.setting_amount() {
-            1. - (amt.log10().abs())
+            if amt > 0.85{
+                let amt = map_range(amt, 0.85, 1., 0., 1.);
+                amt
+            } else {
+                0.
+            }
         } else if model.sun.has_set() {
             1.
         } else {
